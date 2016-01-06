@@ -24,11 +24,14 @@ public class CameraManager : Singleton<CameraManager>
     private int camCinematicPos;
     private int camNumber;
     private bool rendering;
-    private CameraScript camera;
+    private CameraScript currentCamera;
+    private Camera oldCam;
+    private Character characterScript;
 
     // Use this for initialization
     void Awake ()
     {
+        characterScript = character.GetComponent<Character>();
         sky = FindObjectOfType<Sky>();
         CameraScript[] c = FindObjectsOfType<CameraScript>();
         cams = new Dictionary<string, CameraScript>(c.Length);
@@ -41,7 +44,7 @@ public class CameraManager : Singleton<CameraManager>
         camCinematicPos = 0;
         camNumber = 0;
         rendering = false;
-        camera = null;
+        currentCamera = null;
     }
 	
 	// Update is called once per frame
@@ -49,9 +52,9 @@ public class CameraManager : Singleton<CameraManager>
     {
         if(!rendering && !Over)
         {
-            if(camera != null)
+            if(currentCamera != null)
             {
-                if(camera.Over)
+                if(currentCamera.Over)
                 {
                     if(camNumber == 0)
                     {
@@ -66,7 +69,7 @@ public class CameraManager : Singleton<CameraManager>
                             rendering = true;
                         }
                         else
-                            NextCam(camera.gameObject);
+                            NextCam();
                     }
                 }
             }
@@ -77,11 +80,21 @@ public class CameraManager : Singleton<CameraManager>
 
                 if (cams.TryGetValue(cam_name, out cam))
                 {
-                    camera = cam;
-                    camera.gameObject.SetActive(true);
+                    if(oldCam != null)
+                    {
+                        oldCam.enabled = false;
+                        oldCam.gameObject.SetActive(false);
+                    }
+                    currentCamera = cam;
+                    currentCamera.gameObject.SetActive(true);
+                    currentCamera.GetComponent<Camera>().enabled = true;
                     if (camNumber == 0)
                     {
                         StartCoroutine(StartCam1_1());
+                    }
+                    else if(camNumber == 1)
+                    {
+
                     }
 
                     rendering = true;
@@ -94,32 +107,34 @@ public class CameraManager : Singleton<CameraManager>
 
     IEnumerator StartCam1_1()
     {
-        camera.Traveling(traveling_pt1.position, traveling_pt2.position);
-        float zoom = camera.DeltaTimeZoom;
+        currentCamera.Traveling(traveling_pt1.position, traveling_pt2.position);
+        float zoom = currentCamera.DeltaTimeZoom;
         yield return new WaitForSeconds(1f);
-        camera.DeltaTimeZoom = 2f;
-        camera.Zoom(0.3f);
+        currentCamera.DeltaTimeZoom = 2f;
+        currentCamera.Zoom(0.3f);
         yield return new WaitForSeconds(0.5f);
-        camera.DeltaTimeZoom = 1.8f;
-        camera.Zoom(0.1f);
+        currentCamera.DeltaTimeZoom = 1.8f;
+        currentCamera.Zoom(0.1f);
         yield return new WaitForSeconds(1f);
-        camera.DeltaTimeZoom = zoom;
+        currentCamera.DeltaTimeZoom = zoom;
         yield return new WaitForSeconds(2f);
         StartCoroutine(StartSunSpeed());
     }
 
     IEnumerator StartCam1_2()
     {
-        camera.LookAtTarget(center);
+        currentCamera.LookAtTarget(center.position);
         yield return new WaitForSeconds(1f);
-        camera.RotateCam(center, new Vector3(0f, 360f, 0f));
+        currentCamera.RotateCam(center, new Vector3(0f, 360f, 0f));
     }
     IEnumerator StartCam1_3()
     {
-        camera.DeltaTimeLook = 1.5f;
-        camera.LookAtTarget(character);
+        currentCamera.DeltaTimeLook = 1.5f;
+        currentCamera.LookAtTarget(character.position);
         yield return new WaitForSeconds(0.5f);
-        camera.Zoom(0.9f);
+        currentCamera.Zoom(0.9f);
+        characterScript.StartCharacter();
+        currentCamera.WaitCam(10f);
     }
 
     IEnumerator StartSunSpeed()
@@ -136,12 +151,20 @@ public class CameraManager : Singleton<CameraManager>
         sky.Speed = speed;
     }
 
-    private void NextCam(GameObject cam)
+    IEnumerator StartCam2_1()
+    {
+        currentCamera.DeltaTimeLook = 1.5f;
+        currentCamera.LookAtTarget(character.position + character.forward * 2f);
+        currentCamera.WaitCam(30f);
+        yield return new WaitForSeconds(0.5f);
+    }
+
+    private void NextCam()
     {
         camNumber++;
         camCinematicPos = 0;
-        cam.SetActive(false);
-        camera = null;
+        oldCam = currentCamera.GetComponent<Camera>();
+        currentCamera = null;
         rendering = false;
     }
 

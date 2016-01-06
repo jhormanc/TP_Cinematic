@@ -30,6 +30,11 @@ public class CameraScript : MonoBehaviour
     private Vector3 targetLookAt;
     private bool looking;
 
+    // Wait
+    private float waitTime;
+    private float targetWaitTime;
+    private bool waiting;
+
     private Camera cam;
     private CameraManager manager;
 
@@ -84,12 +89,19 @@ public class CameraScript : MonoBehaviour
             // Smoothly rotate towards the target point.
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * DeltaTimeLook);
 
-            if (Quaternion.Angle(transform.rotation, targetRotation) < 2f)
+            if (Quaternion.Angle(transform.rotation, targetRotation) < 1f)
                 looking = false;
         }
 
-        Over = (!traveling && !zooming && !rotation && !looking);
-        Debug.Log(string.Format("traveling = {0}, zooming = {1}, rotation = {2}, looking = {3}", traveling, zooming, rotation, looking));
+        if(waiting)
+        {
+            waitTime += Time.deltaTime;
+            if (waitTime > targetWaitTime)
+                waiting = false;
+        }
+
+        Over = (!traveling && !zooming && !rotation && !looking && !waiting);
+
         if(!oldOver && Over)
             manager.EndCam();
     }
@@ -134,10 +146,17 @@ public class CameraScript : MonoBehaviour
         rotation = true;
     }
 
-    public void LookAtTarget(Transform target)
+    public void LookAtTarget(Vector3 target)
     {
-        targetLookAt = target.position; // Vector3.Normalize(target.position - transform.position);
+        targetLookAt = target;
         looking = true;
+    }
+
+    public void WaitCam(float timeToWait)
+    {
+        waitTime = 0f;
+        targetWaitTime = timeToWait;
+        waiting = true;
     }
 
     private Vector3 RotatePtAround(Vector3 point, Vector3 pivot, Vector3 angles)

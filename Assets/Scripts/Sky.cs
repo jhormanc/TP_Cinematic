@@ -17,6 +17,8 @@ public class Sky : MonoBehaviour
     private Light moonLight;
     private Material skyMaterial;
     private float offsetTextU;
+    private Light spot;
+    private Light point;
 
     // Use this for initialization
     void Awake ()
@@ -26,7 +28,8 @@ public class Sky : MonoBehaviour
         clouds = transform.Find("Clouds");
         moon = transform.Find("Moon").Find("Moon1").Find("Light");
         moonLight = moon.GetComponent<Light>();
-
+        spot = GameObject.Find("Spotlight").GetComponent<Light>();
+        point = GameObject.Find("Pointlight").GetComponent<Light>();
         anim = GetComponent<Animator>();
         anim.speed = Speed;
         skyMaterial = GetComponent<Renderer>().material;
@@ -46,7 +49,11 @@ public class Sky : MonoBehaviour
         if (Day)
         {
             if (moonLight.enabled)
+            {
                 moonLight.enabled = false;
+                spot.enabled = false;
+                point.enabled = false;
+            }
             if (!sunLight.enabled)
                 sunLight.enabled = true;
 
@@ -58,7 +65,11 @@ public class Sky : MonoBehaviour
             if (sunLight.enabled)
                 sunLight.enabled = false;
             if (!moonLight.enabled)
+            {
                 moonLight.enabled = true;
+                spot.enabled = true;
+                point.enabled = true;
+            }
 
             moonLight.intensity = Mathf.Abs(y_sun) * 0.2f;
             moon.LookAt(center);
