@@ -4,15 +4,10 @@ using System.Collections;
 public class CameraScript : MonoBehaviour
 {
     public bool Over;
-
-    [SerializeField]
-    private float DeltaTimeTraveling;
-
-    [SerializeField]
-    private float DeltaTimeZoom;
-
-    [SerializeField]
-    private float DeltaTimeRotate;
+    public float DeltaTimeTraveling;
+    public float DeltaTimeZoom;
+    public float DeltaTimeRotate;
+    public float DeltaTimeLook;
 
     // Traveling
     private bool traveling;
@@ -23,6 +18,7 @@ public class CameraScript : MonoBehaviour
     private bool rotation;
     private Vector3 pivotRot;
     private Vector3 targetAngles;
+    private Vector3 currentAngle;
 
     // Zoom
     private const float MinFov = 5f;
@@ -30,63 +26,96 @@ public class CameraScript : MonoBehaviour
     private float targetFov;
     private bool zooming;
 
+    // Look at
+    private Vector3 targetLookAt;
+    private bool looking;
+
     private Camera cam;
     private CameraManager manager;
 
     // Use this for initialization
     void Awake ()
     {
-        traveling = false;
         cam = GetComponent<Camera>();
         maxFov = cam.fieldOfView - MinFov;
         manager = CameraManager.Instance;
+        looking = false;
+        zooming = false;
+        traveling = false;
+        rotation = false;
     }
 	
 	// Update is called once per frame
 	void Update ()
     {
+        bool oldOver = Over;
+
 	    if(traveling)
         {
             transform.position = Vector3.Lerp(transform.position, target, Time.deltaTime * DeltaTimeTraveling);
-            transform.LookAt(lookAt);
+            
 
-            if (transform.position == target)
-            {
+            if (Vector3.Distance(transform.position, target) < 10f)
                 traveling = false;
-                //manager.NextCam(gameObject);
-            }
         }
 
         if(zooming)
         {
-            float fov;
-            cam.fieldOfView = 1f;
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, Time.deltaTime * DeltaTimeZoom);
+            if (Mathf.Abs(cam.fieldOfView - targetFov) < 2f)
+                zooming = false;
         }
 
         if(rotation)
         {
-            Vector3 angles = Vector3.Lerp(transform.rotation.eulerAngles, targetAngles, Time.deltaTime * DeltaTimeRotate);
-            transform.position = RotatePtAround(transform.position, pivotRot, angles);
+            Vector3 angle = Vector3.Lerp(Vector3.zero, targetAngles, Time.deltaTime * DeltaTimeRotate);
+            transform.position = RotatePtAround(transform.position, pivotRot, angle);
+            currentAngle += angle;
 
-            if(transform.rotation.eulerAngles == targetAngles)
-            {
+            transform.LookAt(lookAt);
+            if (Mathf.Abs((targetAngles - currentAngle).sqrMagnitude) < 10f)
                 rotation = false;
-            }
         }
 
-        Over = (!traveling && !zooming && !rotation);
+        if(looking)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(targetLookAt - transform.position);
+            
+            // Smoothly rotate towards the target point.
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * DeltaTimeLook);
+
+            if (Quaternion.Angle(transform.rotation, targetRotation) < 2f)
+                looking = false;
+        }
+
+        Over = (!traveling && !zooming && !rotation && !looking);
+        Debug.Log(string.Format("traveling = {0}, zooming = {1}, rotation = {2}, looking = {3}", traveling, zooming, rotation, looking));
+        if(!oldOver && Over)
+            manager.EndCam();
     }
 
-    public void Traveling(Vector3 p1, Vector3 p2, Transform look_at)
+    public void Traveling(Vector3 from, Vector3 to, Transform look_at)
     {
-        Traveling(p1, p2);
+        Traveling(from, to);
         lookAt = look_at;
     }
 
-    public void Traveling(Vector3 p1, Vector3 p2)
+    public void Traveling(Vector3 to, Transform look_at)
     {
-        transform.position = p1;
-        target = p2;
+        Traveling(to);
+        lookAt = look_at;
+    }
+
+    public void Traveling(Vector3 from, Vector3 to)
+    {
+        transform.position = from;
+        Traveling(to);
+    }
+
+    public void Traveling(Vector3 to)
+    {
+        target = to;
+        lookAt = null;
         traveling = true;
     }
 
@@ -96,11 +125,19 @@ public class CameraScript : MonoBehaviour
         zooming = true;
     }
 
-    public void RotateCam(Vector3 pivot, Vector3 angles)
+    public void RotateCam(Transform pivot, Vector3 angles)
     {
-        pivotRot = pivot;
+        pivotRot = pivot.position;
         targetAngles = angles;
+        currentAngle = Vector3.zero;
+        lookAt = pivot;
         rotation = true;
+    }
+
+    public void LookAtTarget(Transform target)
+    {
+        targetLookAt = target.position; // Vector3.Normalize(target.position - transform.position);
+        looking = true;
     }
 
     private Vector3 RotatePtAround(Vector3 point, Vector3 pivot, Vector3 angles)
@@ -109,7 +146,6 @@ public class CameraScript : MonoBehaviour
         Vector3 dir = point - pivot;
         // Rotate it
         dir = Quaternion.Euler(angles) * dir;
-        // Calculate rotated point
         return dir + pivot;
     }
 }
